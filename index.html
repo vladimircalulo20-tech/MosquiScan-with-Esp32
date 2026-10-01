@@ -1,1 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MosquiScan: A Smartphone-Based AI System for Detecting Potential Mosquito Breeding Sites">
+  <title>MosquiScan | Smartphone-Based AI System</title>
+
+  <link rel="icon" href="cmhs-logo.png">
+  <link rel="stylesheet" href="style.css">
+
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIINfQ3pK9gJ1Q6tG7gQY8G7Q5hY1z5c2W4="
+        crossorigin="">
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+</head>
+
+<body>
+  <header class="main-header">
+    <div class="header-inner">
+      <div class="brand">
+        <img src="cmhs-logo.png" alt="Candijay Municipal High School Logo" class="school-logo">
+        <div>
+          <div class="brand-name">MOSQUISCAN</div>
+          <div class="brand-subtitle">
+            A Smartphone-Based AI System for Detecting Potential Mosquito Breeding Sites
+          </div>
+          <div class="school-label">Candijay Municipal High School</div>
+        </div>
+      </div>
+
+      <div class="esp-status">
+        <span id="espDot" class="status-dot"></span>
+        <span id="espStatus">ESP32: Not Tested</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div>
+        <span class="badge">AI • SMARTPHONE • ESP32 • MAPPING</span>
+        <h1>Smartphone-Based Mosquito-Breeding-Site Assessment</h1>
+        <p>
+          Capture an inspection image with a smartphone, classify it using AI,
+          record the inspection location, and show the result using a physical
+          red or green LED.
+        </p>
+      </div>
+    </section>
+
+    <section class="dashboard-grid">
+      <div class="stat-card total">
+        <span>Total Records</span>
+        <strong id="totalRecords">0</strong>
+      </div>
+      <div class="stat-card possible">
+        <span>Possible Sites</span>
+        <strong id="possibleSites">0</strong>
+      </div>
+      <div class="stat-card not-possible">
+        <span>Not Possible Sites</span>
+        <strong id="notPossibleSites">0</strong>
+      </div>
+    </section>
+
+    <section class="grid two-col">
+      <div class="card">
+        <div class="section-title">
+          <span>📷</span>
+          <div>
+            <h2>New Inspection</h2>
+            <p>Use your smartphone camera or select an image.</p>
+          </div>
+        </div>
+
+        <label class="upload-box" for="imageInput">
+          <span class="upload-icon">📸</span>
+          <strong>Capture / Upload Image</strong>
+          <small>Tap here to use your phone camera.</small>
+        </label>
+        <input id="imageInput" type="file" accept="image/*" capture="environment">
+
+        <div id="previewWrap" class="preview-wrap hidden">
+          <img id="previewImage" alt="Inspection preview">
+        </div>
+
+        <div class="result-panel">
+          <div class="result-label">AI Classification</div>
+          <div id="aiResult" class="result waiting">Waiting for image...</div>
+
+          <div class="confidence-row">
+            <span>Confidence</span>
+            <strong id="confidence">—</strong>
+          </div>
+
+          <div class="reason-box">
+            <strong>Assessment Reason</strong>
+            <p id="reason">
+              The AI result and assessment reason will appear here after classification.
+            </p>
+          </div>
+        </div>
+
+        <div class="button-row">
+          <button id="classifyButton" class="primary" disabled>Analyze Image</button>
+          <button id="sendLedButton" class="secondary" disabled>Send Result to ESP32</button>
+        </div>
+
+        <div id="systemMessage" class="message"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <span>📍</span>
+          <div>
+            <h2>Inspection Location</h2>
+            <p>Set the location where the image was taken.</p>
+          </div>
+        </div>
+
+        <div id="map"></div>
+
+        <div class="location-buttons">
+          <button id="locationButton" class="secondary">📍 Use Current Location</button>
+          <button id="clearLocationButton" class="ghost">Clear</button>
+        </div>
+
+        <div class="coordinates">
+          <label>
+            Latitude
+            <input id="latitude" type="number" step="any" placeholder="e.g. 9.8190">
+          </label>
+          <label>
+            Longitude
+            <input id="longitude" type="number" step="any" placeholder="e.g. 124.4970">
+          </label>
+        </div>
+
+        <label class="field-label">
+          Notes
+          <textarea id="notes" rows="4"
+            placeholder="Example: Standing water was visible in a water-holding container."></textarea>
+        </label>
+
+        <button id="saveButton" class="save-button" disabled>💾 Save Inspection Record</button>
+      </div>
+    </section>
+
+    <section class="card records-card">
+      <div class="section-title records-heading">
+        <span>📋</span>
+        <div>
+          <h2>Inspection Records</h2>
+          <p>Saved results and locations from this browser.</p>
+        </div>
+        <button id="clearRecordsButton" class="danger-outline">Clear Records</button>
+      </div>
+
+      <div id="recordsList" class="records-list">
+        <div class="empty-state">No inspection records yet.</div>
+      </div>
+    </section>
+
+    <section class="card how-card">
+      <h2>How MosquiScan Works</h2>
+      <div class="steps">
+        <div><b>1</b><span>Capture an image using a smartphone.</span></div>
+        <div><b>2</b><span>AI classifies the image.</span></div>
+        <div><b>3</b><span>The result is sent through Wi-Fi to the ESP32.</span></div>
+        <div><b>4</b><span>Red LED = Possible; Green LED = Not Possible.</span></div>
+        <div><b>5</b><span>The inspection can be saved with location and notes.</span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <strong>MosquiScan</strong> • Smartphone-Based AI System for Detecting Potential Mosquito Breeding Sites
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
+  <script src="script.js"></script>
+</body>
+</html>
 
